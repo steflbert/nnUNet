@@ -18,6 +18,7 @@ import shutil
 from batchgenerators.utilities.file_and_folder_operations import *
 from multiprocessing import Pool
 from collections import OrderedDict
+from pathlib import Path
 
 
 def create_nonzero_mask(data):
@@ -49,12 +50,12 @@ def crop_to_bbox(image, bbox):
 
 
 def get_case_identifier(case):
-    case_identifier = case[0].split("/")[-1].split(".nii.gz")[0][:-5]
+    case_identifier = Path(case[0]).parts[-1].split(".nii.gz")[0][:-5]
     return case_identifier
 
 
 def get_case_identifier_from_npz(case):
-    case_identifier = case.split("/")[-1][:-4]
+    case_identifier = Path(case).parts[-1][:-4]
     return case_identifier
 
 
@@ -117,7 +118,7 @@ def crop_to_nonzero(data, seg=None, nonzero_label=-1):
 
 
 def get_patient_identifiers_from_cropped_files(folder):
-    return [i.split("/")[-1][:-4] for i in subfiles(folder, join=True, suffix=".npz")]
+    return [Path(i).parts[-1][:-4] for i in subfiles(folder, join=True, suffix=".npz")]
 
 
 class ImageCropper(object):
@@ -176,7 +177,7 @@ class ImageCropper(object):
         return subfiles(self.output_folder, join=True, suffix=".npz")
 
     def get_patient_identifiers_from_cropped_files(self):
-        return [i.split("/")[-1][:-4] for i in self.get_list_of_cropped_files()]
+        return [Path(i).parts[-1][:-4] for i in self.get_list_of_cropped_files()]
 
     def run_cropping(self, list_of_files, overwrite_existing=False, output_folder=None):
         """

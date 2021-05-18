@@ -13,6 +13,7 @@
 #    limitations under the License.
 from multiprocessing.pool import Pool
 import shutil
+from pathlib import Path
 import numpy as np
 from nnunet.configuration import default_num_threads
 from nnunet.evaluation.evaluator import aggregate_scores
@@ -94,7 +95,7 @@ def ensemble(training_output_folder1, training_output_folder2, output_folder, ta
     if not isfile(join(output_folder, "summary.json")) and len(out_files) > 0:
         aggregate_scores(tuple(zip(out_files, gt_segmentations)), labels=plans['all_classes'],
                      json_output_file=join(output_folder, "summary.json"), json_task=task,
-                     json_name=task + "__" + output_folder_base.split("/")[-1], num_threads=default_num_threads)
+                     json_name=task + "__" + Path(output_folder_base).parts[-1], num_threads=default_num_threads)
 
     if not isfile(join(output_folder_base, "postprocessing.json")):
         # now lets also look at postprocessing. We cannot just take what we determined in cross-validation and apply it
@@ -105,12 +106,12 @@ def ensemble(training_output_folder1, training_output_folder2, output_folder, ta
         out_dir_all_json = join(network_training_output_dir, "summary_jsons")
         json_out = load_json(join(output_folder_base, "ensembled_postprocessed", "summary.json"))
 
-        json_out["experiment_name"] = output_folder_base.split("/")[-1]
+        json_out["experiment_name"] = Path(output_folder_base).parts[-1]
         save_json(json_out, join(output_folder_base, "ensembled_postprocessed", "summary.json"))
 
         maybe_mkdir_p(out_dir_all_json)
         shutil.copy(join(output_folder_base, "ensembled_postprocessed", "summary.json"),
-                    join(out_dir_all_json, "%s__%s.json" % (task, output_folder_base.split("/")[-1])))
+                    join(out_dir_all_json, "%s__%s.json" % (task, Path(output_folder_base).parts[-1])))
 
 
 

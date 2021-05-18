@@ -17,6 +17,7 @@ import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import subfiles
 import os
 from collections import OrderedDict
+from pathlib import Path
 
 folder = "/home/fabian/drives/E132-Projekte/Projects/2018_MedicalDecathlon/Leaderboard"
 task_descriptors = ['2D final 2',
@@ -32,7 +33,7 @@ for t in task_descriptors:
     mean_scores[t] = OrderedDict()
 
 json_files = subfiles(folder, True, None, ".json", True)
-json_files = [i for i in json_files if not i.split("/")[-1].startswith(".")]  # stupid mac
+json_files = [i for i in json_files if not Path(i).parts[-1].startswith(".")]  # stupid mac
 for j in json_files:
     with open(j, 'r') as f:
         res = json.load(f)

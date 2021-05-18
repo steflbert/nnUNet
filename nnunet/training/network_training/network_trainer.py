@@ -94,8 +94,8 @@ class NetworkTrainer(object):
         # too high the training will take forever
         self.train_loss_MA_alpha = 0.93  # alpha * old + (1-alpha) * new
         self.train_loss_MA_eps = 5e-4  # new MA must be at least this much better (smaller)
-        self.max_num_epochs = 1000
-        self.num_batches_per_epoch = 250
+        self.max_num_epochs = 10 # TODO: increase later
+        self.num_batches_per_epoch = 10 #TODO: increase later
         self.num_val_batches_per_epoch = 50
         self.also_val_in_tr_mode = False
         self.lr_threshold = 1e-6  # the network will not terminate training if the lr is still above this threshold
@@ -114,12 +114,12 @@ class NetworkTrainer(object):
         self.log_file = None
         self.deterministic = deterministic
 
-        self.use_progress_bar = False
+        self.use_progress_bar = True
         if 'nnunet_use_progress_bar' in os.environ.keys():
             self.use_progress_bar = bool(int(os.environ['nnunet_use_progress_bar']))
 
         ################# Settings for saving checkpoints ##################################
-        self.save_every = 50
+        self.save_every = 5
         self.save_latest_only = True  # if false it will not store/overwrite _latest but separate files each
         # time an intermediate checkpoint is created
         self.save_intermediate_checkpoints = True  # whether or not to save checkpoint_latest
@@ -208,11 +208,11 @@ class NetworkTrainer(object):
             if len(self.all_val_losses_tr_mode) > 0:
                 ax.plot(x_values, self.all_val_losses_tr_mode, color='g', ls='-', label="loss_val, train=True")
             if len(self.all_val_eval_metrics) == len(x_values):
-                ax2.plot(x_values, self.all_val_eval_metrics, color='g', ls='--', label="evaluation metric")
+                ax2.plot(x_values, self.all_val_eval_metrics, color='g', ls='--', label="evaluation metric (approximate foreground Dice score)")
 
             ax.set_xlabel("epoch")
             ax.set_ylabel("loss")
-            ax2.set_ylabel("evaluation metric")
+            ax2.set_ylabel("evaluation metric (approximate foreground Dice score)")
             ax.legend()
             ax2.legend(loc=9)
 
@@ -279,7 +279,8 @@ class NetworkTrainer(object):
             'optimizer_state_dict': optimizer_state_dict,
             'lr_scheduler_state_dict': lr_sched_state_dct,
             'plot_stuff': (self.all_tr_losses, self.all_val_losses, self.all_val_losses_tr_mode,
-                           self.all_val_eval_metrics)}
+                           self.all_val_eval_metrics),
+            'best_stuff' : (self.best_epoch_based_on_MA_tr_loss, self.best_MA_tr_loss_for_patience, self.best_val_eval_criterion_MA)}
         if self.amp_grad_scaler is not None:
             save_this['amp_grad_scaler'] = self.amp_grad_scaler.state_dict()
 
@@ -370,6 +371,11 @@ class NetworkTrainer(object):
 
         self.all_tr_losses, self.all_val_losses, self.all_val_losses_tr_mode, self.all_val_eval_metrics = checkpoint[
             'plot_stuff']
+
+        # load best loss (if present)
+        if 'best_stuff' in checkpoint.keys():
+            self.best_epoch_based_on_MA_tr_loss, self.best_MA_tr_loss_for_patience, self.best_val_eval_criterion_MA = checkpoint[
+                'best_stuff']
 
         # after the training is done, the epoch is incremented one more time in my old code. This results in
         # self.epoch = 1001 for old trained models when the epoch is actually 1000. This causes issues because
@@ -523,7 +529,7 @@ class NetworkTrainer(object):
         else:
             if len(self.all_val_eval_metrics) == 0:
                 """
-                We here use alpha * old - (1 - alpha) * new because new in this case is the vlaidation loss and lower
+                We here use alpha * old - (1 - alpha) * new because new in this case is the validation loss and lower
                 is better, so we need to negate it.
                 """
                 self.val_eval_criterion_MA = self.val_eval_criterion_alpha * self.val_eval_criterion_MA - (
@@ -687,9 +693,9 @@ class NetworkTrainer(object):
         losses = []
         log_lrs = []
 
-        for batch_num in range(1, num_iters + 1):
+        for batch_num in trange(1, num_iters + 1, unit='batch'):
             # +1 because this one here is not designed to have negative loss...
-            loss = self.run_iteration(self.tr_gen, do_backprop=True, run_online_evaluation=False).data.item() + 1
+            loss = self.run_iteration(self.tr_gen, do_backprop=True, run_online_evaluation=False).item() + 1
 
             # Compute the smoothed loss
             avg_loss = beta * avg_loss + (1 - beta) * loss
@@ -716,6 +722,9 @@ class NetworkTrainer(object):
         fig = plt.figure()
         plt.xscale('log')
         plt.plot(lrs[10:-5], losses[10:-5])
+        plt.xlabel('Learning Rate')
+        plt.ylabel('Loss')
+        plt.title('Loss for different learning rates')
         plt.savefig(join(self.output_folder, "lr_finder.png"))
         plt.close()
         return log_lrs, losses

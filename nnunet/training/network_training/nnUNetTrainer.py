@@ -18,6 +18,7 @@ from collections import OrderedDict
 from multiprocessing import Pool
 from time import sleep
 from typing import Tuple, List
+from pathlib import Path
 
 import matplotlib
 import nnunet
@@ -367,11 +368,11 @@ class nnUNetTrainer(NetworkTrainer):
         self.use_mask_for_norm = plans['use_mask_for_norm']
         self.only_keep_largest_connected_component = plans['keep_only_largest_region']
         self.min_region_size_per_class = plans['min_region_size_per_class']
-        self.min_size_per_class = None  # DONT USE THIS. plans['min_size_per_class']
+        self.min_size_per_class = None  # DON'T USE THIS. plans['min_size_per_class']
 
         if plans.get('transpose_forward') is None or plans.get('transpose_backward') is None:
             print("WARNING! You seem to have data that was preprocessed with a previous version of nnU-Net. "
-                  "You should rerun preprocessing. We will proceed and assume that both transpose_foward "
+                  "You should rerun preprocessing. We will proceed and assume that both transpose_forward "
                   "and transpose_backward are [0, 1, 2]. If that is not correct then weird things will happen!")
             plans['transpose_forward'] = [0, 1, 2]
             plans['transpose_backward'] = [0, 1, 2]
@@ -385,7 +386,7 @@ class nnUNetTrainer(NetworkTrainer):
         else:
             raise RuntimeError("invalid patch size in plans file: %s" % str(self.patch_size))
 
-        if "conv_per_stage" in plans.keys():  # this ha sbeen added to the plans only recently
+        if "conv_per_stage" in plans.keys():  # this has been added to the plans only recently
             self.conv_per_stage = plans['conv_per_stage']
         else:
             self.conv_per_stage = 2
@@ -442,12 +443,12 @@ class nnUNetTrainer(NetworkTrainer):
         return d, s, properties
 
     def preprocess_predict_nifti(self, input_files: List[str], output_file: str = None,
-                                 softmax_ouput_file: str = None, mixed_precision: bool = True) -> None:
+                                 softmax_output_file: str = None, mixed_precision: bool = True) -> None:
         """
         Use this to predict new data
         :param input_files:
         :param output_file:
-        :param softmax_ouput_file:
+        :param softmax_output_file:
         :param mixed_precision:
         :return:
         """
@@ -472,7 +473,7 @@ class nnUNetTrainer(NetworkTrainer):
 
         print("resampling to original spacing and nifti export...")
         save_segmentation_nifti_from_softmax(pred, output_file, properties, interpolation_order,
-                                             self.regions_class_order, None, None, softmax_ouput_file,
+                                             self.regions_class_order, None, None, softmax_output_file,
                                              None, force_separate_z=force_separate_z,
                                              interpolation_order_z=interpolation_order_z)
         print("done")
@@ -578,7 +579,7 @@ class nnUNetTrainer(NetworkTrainer):
 
         for k in self.dataset_val.keys():
             properties = load_pickle(self.dataset[k]['properties_file'])
-            fname = properties['list_of_data_files'][0].split("/")[-1][:-12]
+            fname = Path(properties['list_of_data_files'][0]).parts[-1][:-12]
             if overwrite or (not isfile(join(output_folder, fname + ".nii.gz"))) or \
                     (save_softmax and not isfile(join(output_folder, fname + ".npz"))):
                 data = np.load(self.dataset[k]['data_file'])['data']
@@ -599,7 +600,7 @@ class nnUNetTrainer(NetworkTrainer):
                 else:
                     softmax_fname = None
 
-                """There is a problem with python process communication that prevents us from communicating obejcts
+                """There is a problem with python process communication that prevents us from communicating objects
                 larger than 2 GB between processes (basically when the length of the pickle string that will be sent is
                 communicated by the multiprocessing.Pipe object then the placeholder (\%i I think) does not allow for long
                 enough strings (lol). This could be fixed by changing i to l (for long) but that would require manually
@@ -628,7 +629,7 @@ class nnUNetTrainer(NetworkTrainer):
 
         # evaluate raw predictions
         self.print_to_log_file("evaluation of raw predictions")
-        task = self.dataset_directory.split("/")[-1]
+        task = Path(self.dataset_directory).parts[-1]
         job_name = self.experiment_name
         _ = aggregate_scores(pred_gt_tuples, labels=list(range(self.num_classes)),
                              json_output_file=join(output_folder, "summary.json"),
@@ -643,11 +644,11 @@ class nnUNetTrainer(NetworkTrainer):
         self.print_to_log_file("determining postprocessing")
         determine_postprocessing(self.output_folder, self.gt_niftis_folder, validation_folder_name,
                                  final_subf_name=validation_folder_name + "_postprocessed", debug=debug)
-        # after this the final predictions for the vlaidation set can be found in validation_folder_name_base + "_postprocessed"
+        # after this the final predictions for the validation set can be found in validation_folder_name_base + "_postprocessed"
         # They are always in that folder, even if no postprocessing as applied!
 
-        # detemining postprocesing on a per-fold basis may be OK for this fold but what if another fold finds another
-        # postprocesing to be better? In this case we need to consolidate. At the time the consolidation is going to be
+        # determining postprocessing on a per-fold basis may be OK for this fold but what if another fold finds another
+        # postprocessing to be better? In this case we need to consolidate. At the time the consolidation is going to be
         # done we won't know what self.gt_niftis_folder was, so now we copy all the niftis into a separate folder to
         # be used later
         gt_nifti_folder = join(self.output_folder_base, "gt_niftis")

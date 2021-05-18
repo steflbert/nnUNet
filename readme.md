@@ -284,7 +284,7 @@ but very useful for debugging ;-)
 has ended). This is what is used for both validation and inference.
 - network_architecture.pdf (only if hiddenlayer is installed!): a pdf document with a figure of the network architecture in it.
 - progress.png: A plot of the training (blue) and validation (red) loss during training. Also shows an approximation of 
-the evlauation metric (green). This approximation is the average Dice score of the foreground classes. It should, 
+the evaluation metric (green). This approximation is the average Dice score of the foreground classes. It should, 
 however, only to be taken with a grain of salt because it is computed on randomly drawn patches from the validation 
 data at the end of each epoch, and the aggregation of TP, FP and FN for the Dice computation treats the patches as if 
 they all originate from the same volume ('global Dice'; we do not compute a Dice for each validation case and then 

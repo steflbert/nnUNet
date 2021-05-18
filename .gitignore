@@ -81,9 +81,13 @@ celerybeat-schedule
 # virtualenv
 venv/
 ENV/
+venv-ubuntu
 
 # Spyder project settings
 .spyderproject
+
+# VS Code Settings
+.vscode
 
 # Rope project settings
 .ropeproject
@@ -113,3 +117,4 @@ ENV/
 
 *.model
 
+data
