@@ -18,8 +18,7 @@ from time import sleep
 import matplotlib
 from nnunet.configuration import default_num_threads
 from nnunet.postprocessing.connected_components import determine_postprocessing
-from nnunet.training.data_augmentation.default_data_augmentation import get_default_augmentation, \
-    get_moreDA_augmentation
+from nnunet.training.data_augmentation.data_augmentation_moreDA import get_moreDA_augmentation
 from nnunet.training.dataloading.dataset_loading import DataLoader3D, unpack_dataset
 from nnunet.evaluation.evaluator import aggregate_scores
 from nnunet.network_architecture.neural_network import SegmentationNetwork
@@ -64,7 +63,9 @@ class nnUNetTrainerV2CascadeFullRes(nnUNetTrainerV2):
             self.dataset[k]['seg_from_prev_stage_file'] = join(self.folder_with_segs_from_prev_stage,
                                                                k + "_segFromPrevStage.npz")
             assert isfile(self.dataset[k]['seg_from_prev_stage_file']), \
-                "seg from prev stage missing: %s" % (self.dataset[k]['seg_from_prev_stage_file'])
+                "seg from prev stage missing: %s. " \
+                "Please run all 5 folds of the 3d_lowres configuration of this " \
+                "task!" % (self.dataset[k]['seg_from_prev_stage_file'])
         for k in self.dataset_val:
             self.dataset_val[k]['seg_from_prev_stage_file'] = join(self.folder_with_segs_from_prev_stage,
                                                                    k + "_segFromPrevStage.npz")
@@ -190,7 +191,7 @@ class nnUNetTrainerV2CascadeFullRes(nnUNetTrainerV2):
     def validate(self, do_mirroring: bool = True, use_sliding_window: bool = True, step_size: float = 0.5,
                  save_softmax: bool = True, use_gaussian: bool = True, overwrite: bool = True,
                  validation_folder_name: str = 'validation_raw', debug: bool = False, all_in_gpu: bool = False,
-                 segmentation_export_kwargs: dict = None):
+                 segmentation_export_kwargs: dict = None, run_postprocessing_on_folds: bool = True):
         assert self.was_initialized, "must initialize, ideally with checkpoint (or train first)"
 
         current_mode = self.network.training
@@ -263,9 +264,12 @@ class nnUNetTrainerV2CascadeFullRes(nnUNetTrainerV2):
 
                 data_for_net = np.concatenate((data[:-1], to_one_hot(seg_from_prev_stage[0], range(1, self.num_classes))))
 
-                softmax_pred = self.predict_preprocessed_data_return_seg_and_softmax(data_for_net, do_mirroring,
-                                                                                     mirror_axes, use_sliding_window,
-                                                                                     step_size, use_gaussian,
+                softmax_pred = self.predict_preprocessed_data_return_seg_and_softmax(data_for_net,
+                                                                                     do_mirroring=do_mirroring,
+                                                                                     mirror_axes=mirror_axes,
+                                                                                     use_sliding_window=use_sliding_window,
+                                                                                     step_size=step_size,
+                                                                                     use_gaussian=use_gaussian,
                                                                                      all_in_gpu=all_in_gpu,
                                                                                      mixed_precision=self.fp16)[1]
 
@@ -312,15 +316,16 @@ class nnUNetTrainerV2CascadeFullRes(nnUNetTrainerV2):
                              json_author="Fabian",
                              json_task=task, num_threads=default_num_threads)
 
-        # in the old nnunet we would stop here. Now we add a postprocessing. This postprocessing can remove everything
-        # except the largest connected component for each class. To see if this improves results, we do this for all
-        # classes and then rerun the evaluation. Those classes for which this resulted in an improved dice score will
-        # have this applied during inference as well
-        self.print_to_log_file("determining postprocessing")
-        determine_postprocessing(self.output_folder, self.gt_niftis_folder, validation_folder_name,
-                                 final_subf_name=validation_folder_name + "_postprocessed", debug=debug)
-        # after this the final predictions for the vlaidation set can be found in validation_folder_name_base + "_postprocessed"
-        # They are always in that folder, even if no postprocessing as applied!
+        if run_postprocessing_on_folds:
+            # in the old nnunet we would stop here. Now we add a postprocessing. This postprocessing can remove everything
+            # except the largest connected component for each class. To see if this improves results, we do this for all
+            # classes and then rerun the evaluation. Those classes for which this resulted in an improved dice score will
+            # have this applied during inference as well
+            self.print_to_log_file("determining postprocessing")
+            determine_postprocessing(self.output_folder, self.gt_niftis_folder, validation_folder_name,
+                                     final_subf_name=validation_folder_name + "_postprocessed", debug=debug)
+            # after this the final predictions for the vlaidation set can be found in validation_folder_name_base + "_postprocessed"
+            # They are always in that folder, even if no postprocessing as applied!
 
         # detemining postprocesing on a per-fold basis may be OK for this fold but what if another fold finds another
         # postprocesing to be better? In this case we need to consolidate. At the time the consolidation is going to be

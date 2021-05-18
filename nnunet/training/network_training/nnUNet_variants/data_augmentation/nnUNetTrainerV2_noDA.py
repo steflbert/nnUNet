@@ -16,7 +16,7 @@ from typing import Tuple
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import join, maybe_mkdir_p
 from nnunet.network_architecture.neural_network import SegmentationNetwork
-from nnunet.training.data_augmentation.default_data_augmentation import get_no_augmentation
+from nnunet.training.data_augmentation.data_augmentation_noDA import get_no_augmentation
 from nnunet.training.dataloading.dataset_loading import unpack_dataset, DataLoader3D, DataLoader2D
 from nnunet.training.loss_functions.deep_supervision import MultipleOutputLoss2
 from nnunet.training.network_training.nnUNetTrainerV2 import nnUNetTrainerV2
@@ -94,11 +94,10 @@ class nnUNetTrainerV2_noDataAugmentation(nnUNetTrainerV2):
                         "will wait all winter for your model to finish!")
 
                 self.tr_gen, self.val_gen = get_no_augmentation(self.dl_tr, self.dl_val,
-                                                                    self.data_aug_params[
-                                                                        'patch_size_for_spatialtransform'],
-                                                                    self.data_aug_params,
-                                                                    deep_supervision_scales=self.deep_supervision_scales,
-                                                                    pin_memory=self.pin_memory)
+                                                                params=self.data_aug_params,
+                                                                deep_supervision_scales=self.deep_supervision_scales,
+                                                                pin_memory=self.pin_memory)
+
                 self.print_to_log_file("TRAINING KEYS:\n %s" % (str(self.dataset_tr.keys())),
                                        also_print_to_console=False)
                 self.print_to_log_file("VALIDATION KEYS:\n %s" % (str(self.dataset_val.keys())),
@@ -117,7 +116,7 @@ class nnUNetTrainerV2_noDataAugmentation(nnUNetTrainerV2):
     def validate(self, do_mirroring: bool = True, use_sliding_window: bool = True,
                  step_size: float = 0.5, save_softmax: bool = True, use_gaussian: bool = True, overwrite: bool = True,
                  validation_folder_name: str = 'validation_raw', debug: bool = False, all_in_gpu: bool = False,
-                 segmentation_export_kwargs: dict = None):
+                 segmentation_export_kwargs: dict = None, run_postprocessing_on_folds: bool = True):
         """
         We need to wrap this because we need to enforce self.network.do_ds = False for prediction
 
@@ -128,8 +127,11 @@ class nnUNetTrainerV2_noDataAugmentation(nnUNetTrainerV2):
                   "do_mirroring was set to False")
         do_mirroring = False
         self.network.do_ds = False
-        ret = super().validate(do_mirroring, use_sliding_window, step_size, save_softmax, use_gaussian,
-                               overwrite, validation_folder_name, debug, all_in_gpu, segmentation_export_kwargs)
+        ret = super().validate(do_mirroring=do_mirroring, use_sliding_window=use_sliding_window, step_size=step_size,
+                               save_softmax=save_softmax, use_gaussian=use_gaussian,
+                               overwrite=overwrite, validation_folder_name=validation_folder_name, debug=debug,
+                               all_in_gpu=all_in_gpu, segmentation_export_kwargs=segmentation_export_kwargs,
+                               run_postprocessing_on_folds=run_postprocessing_on_folds)
         self.network.do_ds = ds
         return ret
 

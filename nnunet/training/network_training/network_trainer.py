@@ -306,6 +306,12 @@ class NetworkTrainer(object):
             return self.load_best_checkpoint(train)
         raise RuntimeError("No checkpoint found")
 
+    def load_final_checkpoint(self, train=False):
+        filename = join(self.output_folder, "model_final_checkpoint.model")
+        if not isfile(filename):
+            raise RuntimeError("Final checkpoint not found. Expected: %s. Please finish the training first." % filename)
+        return self.load_checkpoint(filename, train=train)
+
     def load_checkpoint(self, fname, train=True):
         self.print_to_log_file("loading checkpoint", fname, "train=", train)
         if not self.was_initialized:
@@ -393,8 +399,8 @@ class NetworkTrainer(object):
         self._maybe_init_amp()
 
     def _maybe_init_amp(self):
-        if self.fp16 and self.amp_grad_scaler is None and torch.cuda.is_available():
-                self.amp_grad_scaler = GradScaler()
+        if self.fp16 and self.amp_grad_scaler is None:
+            self.amp_grad_scaler = GradScaler()
 
     def plot_network_architecture(self):
         """
@@ -405,6 +411,9 @@ class NetworkTrainer(object):
         pass
 
     def run_training(self):
+        if not torch.cuda.is_available():
+            self.print_to_log_file("WARNING!!! You are attempting to run training on a CPU (torch.cuda.is_available() is False). This can be VERY slow!")
+
         _ = self.tr_gen.next()
         _ = self.val_gen.next()
 

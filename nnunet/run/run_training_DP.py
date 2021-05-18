@@ -17,6 +17,7 @@ import argparse
 from batchgenerators.utilities.file_and_folder_operations import *
 from nnunet.run.default_configuration import get_default_configuration
 from nnunet.paths import default_plans_identifier
+from nnunet.run.load_pretrained_weights import load_pretrained_weights
 from nnunet.training.cascade_stuff.predict_next_stage import predict_next_stage
 from nnunet.training.network_training.nnUNetTrainer import nnUNetTrainer
 from nnunet.training.network_training.nnUNetTrainerCascadeFullRes import nnUNetTrainerCascadeFullRes
@@ -70,6 +71,14 @@ def main():
     parser.add_argument("--disable_saving", required=False, action='store_true',
                         help="If set nnU-Net will not save any parameter files. Useful for development when you are "
                              "only interested in the results and want to save some disk space")
+    parser.add_argument("--disable_postprocessing_on_folds", required=False, action='store_true',
+                        help="Running postprocessing on each fold only makes sense when developing with nnU-Net and "
+                             "closely observing the model performance on specific configurations. You do not need it "
+                             "when applying nnU-Net because the postprocessing for this will be determined only once "
+                             "all five folds have been trained and nnUNet_find_best_configuration is called. Usually "
+                             "running postprocessing on each fold is computationally cheap, but some users have "
+                             "reported issues with very large images. If your images are large (>600x600x600 voxels) "
+                             "you should consider setting this flag.")
     # parser.add_argument("--interp_order", required=False, default=3, type=int,
     #                     help="order of interpolation for segmentations. Testing purpose only. Hands off")
     # parser.add_argument("--interp_order_z", required=False, default=0, type=int,
@@ -77,6 +86,10 @@ def main():
     #                          "Hands off")
     # parser.add_argument("--force_separate_z", required=False, default="None", type=str,
     #                     help="force_separate_z resampling. Can be None, True or False. Testing purpose only. Hands off")
+    parser.add_argument('-pretrained_weights', type=str, required=False, default=None,
+                        help='path to nnU-Net checkpoint file to be used as pretrained model (use .model '
+                             'file, for example model_final_checkpoint.model). Will only be used when actually training. '
+                             'Optional. Beta. Use with caution.')
 
     args = parser.parse_args()
 
@@ -86,6 +99,7 @@ def main():
     network_trainer = args.network_trainer
     validation_only = args.validation_only
     plans_identifier = args.p
+    disable_postprocessing_on_folds = args.disable_postprocessing_on_folds
 
     use_compressed_data = args.use_compressed_data
     decompress_data = not use_compressed_data
@@ -150,21 +164,28 @@ def main():
     else:
         if not validation_only:
             if args.continue_training:
+                # -c was set, continue a previous training and ignore pretrained weights
                 trainer.load_latest_checkpoint()
+            elif (not args.continue_training) and (args.pretrained_weights is not None):
+                # we start a new training. If pretrained_weights are set, use them
+                load_pretrained_weights(trainer.network, args.pretrained_weights)
+            else:
+                # new training without pretraine weights, do nothing
+                pass
             trainer.run_training()
         else:
             if valbest:
                 trainer.load_best_checkpoint(train=False)
             else:
-                trainer.load_latest_checkpoint(train=False)
+                trainer.load_final_checkpoint(train=False)
 
         trainer.network.eval()
 
         # predict validation
-        trainer.validate(save_softmax=args.npz, validation_folder_name=val_folder)
+        trainer.validate(save_softmax=args.npz, validation_folder_name=val_folder,
+                         run_postprocessing_on_folds=not disable_postprocessing_on_folds)
 
         if network == '3d_lowres':
-            trainer.load_best_checkpoint(False)
             print("predicting segmentations for the next stage of the cascade")
             predict_next_stage(trainer, join(dataset_directory, trainer.plans['data_identifier'] + "_stage%d" % 1))
 

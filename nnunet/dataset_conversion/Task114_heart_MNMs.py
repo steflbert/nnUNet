@@ -1,3 +1,17 @@
+#    Copyright 2020 Division of Medical Image Computing, German Cancer Research Center (DKFZ), Heidelberg, Germany
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+
 from collections import OrderedDict
 from batchgenerators.utilities.file_and_folder_operations import *
 import shutil
@@ -168,7 +182,7 @@ def split_4d_for_all_pat(files_paths, split_folder):
           zip(files_paths, [split_folder] * len(files_paths), [None] * len(files_paths)))
 
 if __name__ == "__main__":
-    task_name = "Task114_heart_mnms"
+    task_name = "Task114_heart_MNMs"
     train_dir = "/media/full/97d8d6e1-1aa1-4761-9dd1-fc6a62cf6264/nnUnet_raw/nnUNet_raw_data/{}/imagesTr".format(task_name)
     test_dir = "/media/full/97d8d6e1-1aa1-4761-9dd1-fc6a62cf6264/nnUnet_raw/nnUNet_raw_data/{}/imagesTs".format(task_name)
     #out_dir='/media/full/tera2/output_nnUNet/preprocessed_data/Task114_heart_mnms'

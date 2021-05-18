@@ -43,8 +43,8 @@ standardized environment.
 For more information about nnU-Net, please read the following paper:
 
 
-    Fabian Isensee, Paul F. Jäger, Simon A. A. Kohl, Jens Petersen, Klaus H. Maier-Hein "Automated Design of Deep Learning 
-    Methods for Biomedical Image Segmentation" arXiv preprint arXiv:1904.08128 (2020).
+    Isensee, F., Jaeger, P. F., Kohl, S. A., Petersen, J., & Maier-Hein, K. H. (2020). nnU-Net: a self-configuring method 
+    for deep learning-based biomedical image segmentation. Nature Methods, 1-9.
 
 Please also cite this paper if you are using nnU-Net for your research!
 
@@ -66,31 +66,37 @@ Please also cite this paper if you are using nnU-Net for your research!
     + [Run inference](#run-inference)
   * [How to run inference with pretrained models](#how-to-run-inference-with-pretrained-models)
   * [Examples](#examples)
-- [Extending/Changing nnU-Net](#extending-changing-nnu-net)
-- [Information on Runtime and potential performance bottlenecks.](#information-on-runtime-and-potential-performance-bottlenecks)
+- [Extending/Changing nnU-Net](#extending-or-changing-nnu-net)
+- [Information on run time and potential performance bottlenecks.](#information-on-run-time-and-potential-performance-bottlenecks)
 - [Common questions and issues](#common-questions-and-issues)
 
 
 # Installation
-nnU-Net is only tested on Linux (Ubuntu 16, 18 and 20; centOS, RHEL). It may work on other operating systems as well 
-but we do not guarantee that it will.
+nnU-Net has been tested on Linux (Ubuntu 16, 18 and 20; centOS, RHEL). We do not provide support for other operating 
+systems.
 
 nnU-Net requires a GPU! For inference, the GPU should have 4 GB of VRAM. For training nnU-Net models the GPU should have at 
-least 11 GB (such as the RTX 2080ti). Due to the use of mixed precision, fastest training times are achieved with the 
-Volta architecture (Titan V, V100 GPUs) or when compiling pytorch from source 
-(see [here](https://github.com/pytorch/pytorch#from-source)) using cuDNN 8.0.2. Note that future versions of pytorch 
-will include cuDNN 8.0.2 or newer by default and compiling from source will not be necessary.
+least 10 GB (popular non-datacenter options are the RTX 2080ti, RTX 3080 or RTX 3090). Due to the use of automated mixed 
+precision, fastest training times are achieved with the Volta architecture (Titan V, V100 GPUs) when installing pytorch 
+the easy way. Since pytorch comes with cuDNN 7.6.5 and tensor core acceleration on Turing GPUs is not supported for 3D 
+convolutions in this version, you will not get the best training speeds on Turing GPUs. You can remedy that by compiling pytorch from source 
+(see [here](https://github.com/pytorch/pytorch#from-source)) using cuDNN 8.0.2 or newer. This will unlock Turing GPUs 
+(RTX 2080ti, RTX 6000) for automated mixed precision training with 3D convolutions and make the training blistering 
+fast as well. Note that future versions of pytorch may include cuDNN 8.0.2 or newer by default and 
+compiling from source will not be necessary.
+We don't know the speed of Ampere GPUs with vanilla vs self-compiled pytorch yet - this section will be updated as 
+soon as we know.
 
-For training, we recommend a strong CPU top go along with the GPU. At least 6 CPU cores (12 threads) are recommended. CPU 
-requirements are mostly related to data augmentation and scale with the number of input channels and are thus higher 
-for datasets like BraTS which use 4 image 
-modalities and lower for datasets like LiTS which only uses CT images.
+For training, we recommend a strong CPU to go along with the GPU. At least 6 CPU cores (12 threads) are recommended. CPU 
+requirements are mostly related to data augmentation and scale with the number of input channels. They are thus higher 
+for datasets like BraTS which use 4 image modalities and lower for datasets like LiTS which only uses CT images.
 
 We very strongly recommend you install nnU-Net in a virtual environment. 
-[Here is a quick how-to for Ubuntu.](https://linoxide.com/linux-how-to/setup-python-virtual-environment-ubuntu/).
-Please do not use conda environments. This has caused multiple issues in the past.
+[Here is a quick how-to for Ubuntu.](https://linoxide.com/linux-how-to/setup-python-virtual-environment-ubuntu/)
+If you choose to compile pytorch from source, you will need to use conda instead of pip. In that case, please set the 
+environment variable OMP_NUM_THREADS=1 (preferably in your bashrc using `export OMP_NUM_THREADS=1`). This is important!
 
-Python 2 is deprecated and not supported. Please make sure you are using Python 3 :-)
+Python 2 is deprecated and not supported. Please make sure you are using Python 3.
 
 1) Install [PyTorch](https://pytorch.org/get-started/locally/). You need at least version 1.6
 2) Install nnU-Net depending on your use case:
@@ -110,7 +116,7 @@ set a few of environment variables. Please follow the instructions [here](docume
 plots of the network topologies it generates (see [Model training](#model-training)). To install hiddenlayer, 
 run the following commands:
     ```bash
-    pip install --upgrade git+https://github.com/nanohanno/hiddenlayer.git@bugfix/get_trace_graph#egg=hiddenlayer
+    pip install --upgrade git+https://github.com/FabianIsensee/hiddenlayer.git@more_plotted_details#egg=hiddenlayer
     ```
 
 Installing nnU-Net will add several new commands to your terminal. These commands are used to run the entire nnU-Net 
@@ -182,47 +188,60 @@ tens of minutes.
 nnU-Net trains all U-Net configurations in a 5-fold cross-validation. This enables nnU-Net to determine the 
 postprocessing and ensembling (see next step) on the training dataset. Per default, all U-Net configurations need to 
 be run on a given dataset. There are, however situations in which only some configurations (and maybe even without 
-running the cross-validation) are desired. See [FAQ](#faq) for more information.
+running the cross-validation) are desired. See [FAQ](documentation/common_questions.md) for more information.
 
 Note that not all U-Net configurations are created for all datasets. In datasets with small image sizes, the U-Net 
 cascade is omitted because the patch size of the full resolution U-Net already covers a large part of the input images.
 
 Training models is done with the `nnUNet_train` command. The general structure of the command is:
 ```bash
-nnUNet_train CONFIGURATION TRAINER_CLASS_NAME TASK_NAME_OR_ID FOLD (additional options)
+nnUNet_train CONFIGURATION TRAINER_CLASS_NAME TASK_NAME_OR_ID FOLD  --npz (additional options)
 ```
 
 CONFIGURATION is a string that identifies the requested U-Net configuration. TRAINER_CLASS_NAME is the name of the 
 model trainer. If you implement custom trainers (nnU-Net as a framework) you can specify your custom trainer here.
-TASK_NAME_OR_ID specifies what dataset should be trained on and FOLD specifies which fold of the 5-fold-crossvalidaton is trained.
+TASK_NAME_OR_ID specifies what dataset should be trained on and FOLD specifies which fold of the 5-fold-cross-validaton 
+is trained.
 
 nnU-Net stores a checkpoint every 50 epochs. If you need to continue a previous training, just add a `-c` to the 
 training command.
 
- 
+IMPORTANT: `--npz` makes the models save the softmax outputs during the final validation. It should only be used for trainings 
+where you plan to run `nnUNet_find_best_configuration` afterwards 
+(this is nnU-Nets automated selection of the best performing (ensemble of) configuration(s), see below). If you are developing new 
+trainer classes you may not need the softmax predictions and should therefore omit the `--npz` flag. Exported softmax 
+predictions are very large and therefore can take up a lot of disk space.
+If you ran initially without the `--npz` flag but now require the softmax predictions, simply run 
+```bash
+nnUNet_train CONFIGURATION TRAINER_CLASS_NAME TASK_NAME_OR_ID FOLD -val --npz
+```
+to generate them. This will only rerun the validation, not the training.
+
+See `nnUNet_train -h` for additional options.
+
 #### 2D U-Net
 For FOLD in [0, 1, 2, 3, 4], run:
 ```bash
-nnUNet_train 2d nnUNetTrainerV2 TaskXXX_MYTASK FOLD
+nnUNet_train 2d nnUNetTrainerV2 TaskXXX_MYTASK FOLD --npz
 ```
 
 #### 3D full resolution U-Net
 For FOLD in [0, 1, 2, 3, 4], run:
 ```bash
-nnUNet_train 3d_fullres nnUNetTrainerV2 TaskXXX_MYTASK FOLD
+nnUNet_train 3d_fullres nnUNetTrainerV2 TaskXXX_MYTASK FOLD --npz
 ```
 
 #### 3D U-Net cascade
 ##### 3D low resolution U-Net
 For FOLD in [0, 1, 2, 3, 4], run:
 ```bash
-nnUNet_train 3d_lowres nnUNetTrainerV2 TaskXXX_MYTASK FOLD
+nnUNet_train 3d_lowres nnUNetTrainerV2 TaskXXX_MYTASK FOLD --npz
 ```
 
 ##### 3D full resolution U-Net
 For FOLD in [0, 1, 2, 3, 4], run:
 ```bash
-nnUNet_train 3d_cascade_fullres nnUNetTrainerV2CascadeFullRes TaskXXX_MYTASK FOLD
+nnUNet_train 3d_cascade_fullres nnUNetTrainerV2CascadeFullRes TaskXXX_MYTASK FOLD --npz
 ```
 
 Note that the 3D full resolution U-Net of the cascade requires the five folds of the low resolution U-Net to be 
@@ -430,10 +449,10 @@ To get you started we compiled two simple to follow examples:
 
 Usability not good enough? Let us know!
 
-# Extending/Changing nnU-Net
+# Extending or Changing nnU-Net
 Please refer to [this](documentation/extending_nnunet.md) guide.
 
-# Information on Runtime and potential performance bottlenecks.
+# Information on run time and potential performance bottlenecks.
 
 We have compiled a list of expected epoch times on standardized datasets across many different GPUs. You can use them 
 to verify that your system is performing as expected. There are also tips on how to identify bottlenecks and what 
@@ -445,3 +464,5 @@ Click [here](documentation/expected_epoch_times.md).
 
 We have collected solutions to common [questions](documentation/common_questions.md) and 
 [problems](documentation/common_problems_and_solutions.md). Please consult these documents before you open a new issue.
+
+<img src="HIP_Logo.png" width="512px" />

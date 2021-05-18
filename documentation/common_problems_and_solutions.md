@@ -1,5 +1,12 @@
 # Common Issues and their Solutions
 
+## RuntimeError: Expected scalar type half but found float
+
+This can happen when running inference (or training) with mixed precision enabled on older GPU hardware. It points 
+to some operation not being implemented in half precision for the type of GPU you are using. There are flags to enforce
+ the use of fp32 for both nnUNet_predict and nnUNet_train. If you run into this error, using these flags will probably 
+ solve it. See `nnUNet_predict -h` and `nnUNet_train -h` for what the flags are.
+
 ## nnU-Net gets 'stuck' during preprocessing, training or inference
 nnU-Net uses python multiprocessing to leverage multiple CPU cores during preprocessing, background workers for data 
 augmentation in training, preprocessing of cases during inference as well as resampling and exporting the final 
@@ -60,6 +67,12 @@ make sure to use the most recent nnU-Net version (we constantly try to improve t
 you can always download the zip file from our zenodo (https://zenodo.org/record/4003545) and use the 
 `nnUNet_install_pretrained_model_from_zip` command to install the model.
 
+## Downloading pre-trained models: `unzip: 'unzip' is not recognized as an internal or external command` OR `Command 'unzip' not found`
+
+On Windows systems and on a bare WSL2 system, the `unzip` command may not be present.
+Either install it, unzip the pre-trained model from zenodo download, or update to a newer version of nnUNet that uses the Python build in
+(https://docs.python.org/3/library/zipfile.html)
+
 ## nnU-Net training (2D U-Net): High (and increasing) system RAM usage, OOM
 
 There was a issue with mixed precision causing a system RAM memory leak. This is fixed when using cuDNN 8.0.2 or newer, 
@@ -84,5 +97,8 @@ must be 0, 1, 2, 3 (where 0 must be background!). There cannot be any other valu
 If you run `nnUNet_plan_and_preprocess` with the `--verify_dataset_integrity` option, this should never happen because 
 it will check for wrong values in the label images.
 
-## nnU-Net training: Error: mmap length is greater than file size
+## nnU-Net training: Error: mmap length is greater than file size and EOFError
 Please delete all .npy files in the nnUNet_preprocessed folder of the test you were trying to train. Then try again.
+
+## running nnU-Net on Azure instances
+see https://github.com/MIC-DKFZ/nnUNet/issues/437, thank you @Alaska47

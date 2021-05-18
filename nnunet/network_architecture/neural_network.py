@@ -108,6 +108,8 @@ class SegmentationNetwork(NeuralNetwork):
         :param mixed_precision: if True, will run inference in mixed precision with autocast()
         :return:
         """
+        torch.cuda.empty_cache()
+
         assert step_size <= 1, 'step_size must be smaller than 1. Otherwise there will be a gap between consecutive ' \
                                'predictions'
 
@@ -198,6 +200,8 @@ class SegmentationNetwork(NeuralNetwork):
         :param verbose: Do you want a wall of text? If yes then set this to True
         :return:
         """
+        torch.cuda.empty_cache()
+
         assert step_size <= 1, 'step_size must be smaler than 1. Otherwise there will be a gap between consecutive ' \
                                'predictions'
 
@@ -264,7 +268,7 @@ class SegmentationNetwork(NeuralNetwork):
         assert 0 < step_size <= 1, 'step_size must be larger than 0 and smaller or equal to 1'
 
         # our step width is patch_size*step_size at most, but can be narrower. For example if we have image size of
-        # 110, patch size of 32 and step_size of 0.5, then we want to make 4 steps starting at coordinate 0, 27, 55, 78
+        # 110, patch size of 64 and step_size of 0.5, then we want to make 3 steps starting at coordinate 0, 23, 46
         target_step_sizes_in_voxels = [i * step_size for i in patch_size]
 
         num_steps = [int(np.ceil((i - k) / j)) + 1 for i, j, k in zip(image_size, target_step_sizes_in_voxels, patch_size)]
@@ -293,8 +297,6 @@ class SegmentationNetwork(NeuralNetwork):
         assert self.get_device() != "cpu"
         if verbose: print("step_size:", step_size)
         if verbose: print("do mirror:", do_mirroring)
-
-        torch.cuda.empty_cache()
 
         assert patch_size is not None, "patch_size cannot be None for tiled prediction"
 
@@ -435,8 +437,6 @@ class SegmentationNetwork(NeuralNetwork):
                                                                   'run _internal_predict_2D_2Dconv'
         if verbose: print("do mirror:", do_mirroring)
 
-        torch.cuda.empty_cache()
-
         data, slicer = pad_nd_image(x, min_size, pad_border_mode, pad_kwargs, True,
                                     self.input_shape_must_be_divisible_by)
 
@@ -472,8 +472,6 @@ class SegmentationNetwork(NeuralNetwork):
         assert self.input_shape_must_be_divisible_by is not None, 'input_shape_must_be_divisible_by must be set to ' \
                                                                   'run _internal_predict_3D_3Dconv'
         if verbose: print("do mirror:", do_mirroring)
-
-        torch.cuda.empty_cache()
 
         data, slicer = pad_nd_image(x, min_size, pad_border_mode, pad_kwargs, True,
                                     self.input_shape_must_be_divisible_by)
@@ -609,8 +607,6 @@ class SegmentationNetwork(NeuralNetwork):
         assert self.get_device() != "cpu"
         if verbose: print("step_size:", step_size)
         if verbose: print("do mirror:", do_mirroring)
-
-        torch.cuda.empty_cache()
 
         assert patch_size is not None, "patch_size cannot be None for tiled prediction"
 
